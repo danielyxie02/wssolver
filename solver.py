@@ -13,7 +13,6 @@ dictionary = open('dict.txt', 'r')
 real_words = dictionary.readlines()
 
 #Factors to align coord systems (apparently they're different...) may not work for all.
-#
 xf = 0.2636
 yf = 0.542
 
@@ -84,10 +83,9 @@ def longpress(x, y):
 	payload += move_to(x, y)
 	do(payload)
 	raw_input("Paused. Press Enter to continue")
-	#we get EOF from the last segment, so open the process again xd. NOTE: does this interfere with other stuff? probably not, it's the same thing
 	do(finger_up)
 
-#Returns an Image object of the current screen, also stores it in fn.png
+#Returns an Image object of the current screen, also stores it in fn.png.
 def getscreen(fn):
 	process = subprocess.Popen('adb shell', shell = True, stdin = subprocess.PIPE, stdout = subprocess.PIPE)
 	process.communicate("screencap /sdcard/{}".format(fn))
