@@ -1,11 +1,20 @@
 from PIL import Image
 import subprocess
+import argparse
 import solver
 import time
 import img
 import sys
 
+#Argparse to determine learning mode.
+parser = argparse.ArgumentParser(description="Wordscapes buster.")
+parser.add_argument('-l', '--learn', action='store_true')
+args = parser.parse_args(sys.argv[1:]) #Assuming you invoke with "python wordscapes.py"; "python" is technically sys.argv[0]
+real = vars(args)
+learn = real["learn"]
+
 def main():
+	print "---NEW LEVEL-----------------------"
 	masterstart = time.time()
 
 	#Get the level's screencap
@@ -37,7 +46,7 @@ def main():
 	#Draw 
 	print "Drawing"
 	start = time.time()
-	solver.draw_words(words, len(letters), letters)
+	solver.draw_words(words, len(letters), letters, learn)
 	print "Done drawing"
 	end = time.time()
 	print "Drew answers in {}".format(str(end - start))
@@ -48,4 +57,5 @@ def main():
 	main()
 
 if __name__ == "__main__":
+	solver.tap(0,0) #Get rid of any lines left over from previous runs
 	main()
