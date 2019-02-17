@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from PIL import Image
 import pytesseract
 import solver
@@ -6,11 +5,11 @@ import string
 import numpy
 import sys
 
-#Data for squares.
-left = {6:[480, 685, 685, 480, 275, 275], 		7:[475, 685, 740, 590, 375, 240, 285]}
-up = {6:[1280, 1415, 1650, 1775, 1620, 1415], 	7:[1290, 1385, 1600, 1770, 1770, 1600, 1385]}
-right = {6:[600, 810, 810, 600, 395, 395], 		7:[605, 795, 840, 710, 485, 350, 395]}
-down = {6:[1420, 1535, 1780, 1900, 1780, 1535], 7:[1390, 1490, 1710, 1875, 1875, 1710, 1490]}
+#Data to crop letter-bounding rectangles.
+left = {6:[480, 685, 685, 480, 275, 275], 		7:[465, 675, 740, 590, 375, 240, 285]}
+up = {6:[1280, 1415, 1600, 1775, 1600, 1415], 	7:[1240, 1345, 1560, 1730, 1730, 1560, 1385]}
+right = {6:[600, 810, 810, 600, 395, 395], 		7:[615, 805, 840, 710, 485, 350, 395]}
+down = {6:[1420, 1535, 1780, 1900, 1780, 1535], 7:[1400, 1500, 1710, 1880, 1880, 1710, 1490]}
 
 #Checks if 3 letter words are allowed.
 def nothree(img):
@@ -23,13 +22,12 @@ def nothree(img):
 			b = template.getpixel((x, y))
 			if tuple(numpy.subtract(b, (5,5,5,5))) <= a <= tuple(numpy.add(b, (5,5,5,5))):
 				score += 1
-	#print "Score: " + str(score)
 	if score > 3100:
 		return 1
 	else:
 		return 0
 
-#Determines whether there are 6 or 7 letters used in the level by taking a small chunk near the bottom. 
+#Determines whether there are 6 or 7 letters used in the level by taking a small chunk near the bottom of the letter circle. 
 #If there is a letter, it's 6; if not, 7 (the bottom letters in a 7 config are to the left and right of the bottom letter of a 6 config)
 def sixseven(img):
 	img = img.crop((480, 1775, 600, 1900))
@@ -45,8 +43,6 @@ def sixseven(img):
 				whitecnt += 1
 	blackprop = blackcnt * 1.0 / (h * w)
 	whiteprop = whitecnt * 1.0 / (h * w)
-	#print "Black prop: {}".format(str(blackprop))
-	#print "White prop: {}".format(str(whiteprop))
 	if blackprop > 0.15 or whiteprop > 0.15:
 		return 6
 	else:
@@ -59,7 +55,8 @@ def getsquares(img, mode):
 		crops.append(img.crop((left[mode][i], up[mode][i], right[mode][i], down[mode][i])))
 	return crops
 
-#For a square, try to change it such that the letter is completely black and the background is white. Helps OCR read.
+#For a letter-containing rectangle, try to "clean" it such that the letter stands out. Helps OCR read.
+#This suffers if the background is too light/dark. Oops.
 def clean(img):
 	res = Image.new("RGB", img.size)
 	w, h = res.size
@@ -75,46 +72,36 @@ def clean(img):
 	res.resize((w*10,h*10))
 	return res
 
-#Use tesseract to read from an array of Image objects
+#Use tesseract to read from the letter-containing rectangles
 def tessread(crops):
 	res = ""
 	x = 0
+	goofslist = ['|','[','/','1','\xa9','@','7']
+	goofs = {'i':['|', '[', '/', '1'], 'o':[u'\xa9'], 'q':['@'], 'f':['7']}
 	for i in crops:
-		clean(i).save("tmp{}.png".format(x), dpi = (300, 300))
+		clean(i).save("tmp{}.png".format(x), dpi = (300, 300)) #can use these img files for debugging
 		x += 1
 		t1 = pytesseract.image_to_string(clean(i), config = "--psm 10")
 		t2 = pytesseract.image_to_string(clean(i), config = "--psm 13")
 		read = t1
-		#choose between psm 10 and 13
-		if t1 == "":
+		if t1 == "" or t1[0] not in string.lowercase and t1[0] not in string.uppercase and t1[0] not in goofslist and t1 not in goofslist:
 			read = t2
-		if t2 == "":
-			print "idk?"
-		if len(t1) == 2 and len(t2) == 2:
-			read = t1
-		if len(t1) == 2 and len(t2) == 1:
-			read = t2
-		if t1 == "|" or t1 == "[" or t1 == '/' or t1 == '1':
-			read = t1
-		elif len(t1) > 0:
-			if t1[0] not in string.uppercase and t1[0] not in string.lowercase and t2[0] in string.uppercase or t2[0] in string.lowercase:
-				read = t2
 		#Account for Tesseract goofs. (i = |, q = @, etc.)
-		if read == "VV":
-			res += "w"
-		elif read[0] == u'\xa9':
-			res += 'o'
-		elif read[0] == "|" or read[0] == "[" or read[0] == '/' or read[0] == '1':
-			res += "i"
-		elif read[0] == "@":
-			res += "q"
-		elif read[0] == "=":
-			res += "f"
-		else:
-			res += read[0].lower()
+		normal = 1
+		for key in goofs:
+			if read[0] in goofs[key] or read in goofs[key]:
+				res += key
+				normal = 0
+				break
+		if normal:
+			if read == "VV": #one more small edgecase
+				res += 'w'
+			else:
+				res += read[0].lower()
 	return res
 
-#Gets # of letters, 3-restrict, and letters for a screenshot of an entire level. Screenshot file is supplied through command line.
+#Gets # of letters, 3-restrict, and letters for a screenshot of an entire level. 
+#Screenshot file must be supplied through command line.
 if __name__ == "__main__":
 	raw = Image.open(sys.argv[1])
 	num = sixseven(raw)
