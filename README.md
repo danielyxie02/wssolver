@@ -1,7 +1,6 @@
 # WSSolver
 Solves Wordscapes levels. That's about it.
-## Getting Started
-### Prerequisites
+## Built with
 pillow: https://pypi.org/project/Pillow/
 
 Android Debugging bridge: https://developer.android.com/studio/releases/platform-tools
